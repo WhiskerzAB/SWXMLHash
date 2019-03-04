@@ -1,5 +1,6 @@
 //
 //  TypeConversionPrimitypeTypesTests.swift
+//  SWXMLHash
 //
 //  Copyright (c) 2016 David Mohundro
 //
@@ -20,32 +21,35 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
+//
 
 import SWXMLHash
 import XCTest
 
-// swiftlint:disable force_try
 // swiftlint:disable line_length
 
 class TypeConversionPrimitypeTypesTests: XCTestCase {
     var parser: XMLIndexer?
-    let xmlWithArraysOfTypes = "<root>" +
-        "<arrayOfGoodInts>" +
-        "   <int>0</int> <int>1</int> <int>2</int> <int>3</int>" +
-        "</arrayOfGoodInts>" +
-        "<arrayOfBadInts>" +
-        "   <int></int> <int>boom</int>" +
-        "</arrayOfBadInts>" +
-        "<arrayOfMixedInts>" +
-        "   <int>0</int> <int>boom</int> <int>2</int> <int>3</int>" +
-        "</arrayOfMixedInts>" +
-        "<arrayOfAttributeInts>" +
-        "   <int value=\"0\"/> <int value=\"1\"/> <int value=\"2\"/> <int value=\"3\"/>" +
-        "</arrayOfAttributeInts>" +
-        "<empty></empty>" +
-    "</root>"
+    let xmlWithArraysOfTypes = """
+        <root>
+          <arrayOfGoodInts>
+            <int>0</int> <int>1</int> <int>2</int> <int>3</int>
+          </arrayOfGoodInts>
+          <arrayOfBadInts>
+            <int></int> <int>boom</int>
+          </arrayOfBadInts>
+          <arrayOfMixedInts>
+            <int>0</int> <int>boom</int> <int>2</int> <int>3</int>
+          </arrayOfMixedInts>
+          <arrayOfAttributeInts>
+            <int value=\"0\"/> <int value=\"1\"/> <int value=\"2\"/> <int value=\"3\"/>
+          </arrayOfAttributeInts>
+          <empty></empty>
+        </root>
+    """
 
     override func setUp() {
+        super.setUp()
         parser = SWXMLHash.parse(xmlWithArraysOfTypes)
     }
 
@@ -73,7 +77,7 @@ class TypeConversionPrimitypeTypesTests: XCTestCase {
     func testShouldConvertArrayOfGoodIntsToArrayOfOptionals() {
         do {
             let value: [Int?] = try parser!["root"]["arrayOfGoodInts"]["int"].value()
-            XCTAssertEqual(value.flatMap({ $0 }), [0, 1, 2, 3])
+            XCTAssertEqual(value.compactMap({ $0 }), [0, 1, 2, 3])
         } catch {
             XCTFail("\(error)")
         }
@@ -157,7 +161,7 @@ class TypeConversionPrimitypeTypesTests: XCTestCase {
     func testShouldConvertArrayOfAttributeIntsToArrayOfOptionals() {
         do {
             let value: [Int?] = try parser!["root"]["arrayOfAttributeInts"]["int"].value(ofAttribute: "value")
-            XCTAssertEqual(value.flatMap({ $0 }), [0, 1, 2, 3])
+            XCTAssertEqual(value.compactMap({ $0 }), [0, 1, 2, 3])
         } catch {
             XCTFail("\(error)")
         }

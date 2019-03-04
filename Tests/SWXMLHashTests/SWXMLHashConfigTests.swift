@@ -1,7 +1,8 @@
 //
 //  SWXMLHashConfigTests.swift
+//  SWXMLHash
 //
-//  Copyright (c) 2016 David Mohundro
+//  Copyright (c) 2016 David Mohundro. All rights reserved.
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -20,26 +21,30 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
+//
 
 import SWXMLHash
 import XCTest
 
 class SWXMLHashConfigTests: XCTestCase {
     var parser: XMLIndexer?
-    let xmlWithNamespace = "<root xmlns:h=\"http://www.w3.org/TR/html4/\"" +
-        "  xmlns:f=\"http://www.w3schools.com/furniture\">" +
-        "  <h:table>" +
-        "    <h:tr>" +
-        "      <h:td>Apples</h:td>" +
-        "      <h:td>Bananas</h:td>" +
-        "    </h:tr>" +
-        "  </h:table>" +
-    "</root>"
+    let xmlWithNamespace = """
+        <root xmlns:h=\"http://www.w3.org/TR/html4/\"
+          xmlns:f=\"http://www.w3schools.com/furniture\">
+          <h:table>
+            <h:tr>
+              <h:td>Apples</h:td>
+              <h:td>Bananas</h:td>
+            </h:tr>
+          </h:table>
+        </root>
+    """
 
     override func setUp() {
+        super.setUp()
         parser = SWXMLHash.config { conf in
             conf.shouldProcessNamespaces = true
-            }.parse(xmlWithNamespace)
+        }.parse(xmlWithNamespace)
     }
 
     func testShouldAllowProcessingNamespacesOrNot() {

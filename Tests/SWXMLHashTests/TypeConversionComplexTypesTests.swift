@@ -1,7 +1,8 @@
 //
 //  TypeConversionComplexTypesTests.swift
+//  SWXMLHash
 //
-//  Copyright (c) 2016 David Mohundro
+//  Copyright (c) 2016 David Mohundro. All rights reserved.
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -20,50 +21,51 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
+//
 
 import SWXMLHash
 import XCTest
 
-// swiftlint:disable force_try
-// swiftlint:disable variable_name
-// swiftlint:disable line_length
+// swiftlint:disable identifier_name
 
 class TypeConversionComplexTypesTests: XCTestCase {
     var parser: XMLIndexer?
-    let xmlWithComplexType = "<root>" +
-        "  <complexItem>" +
-        "    <name>the name of complex item</name>" +
-        "    <price>1024</price>" +
-        "    <basicItems>" +
-        "       <basicItem>" +
-        "          <name>item 1</name>" +
-        "          <price>1</price>" +
-        "       </basicItem>" +
-        "       <basicItem>" +
-        "          <name>item 2</name>" +
-        "          <price>2</price>" +
-        "       </basicItem>" +
-        "       <basicItem>" +
-        "          <name>item 3</name>" +
-        "          <price>3</price>" +
-        "       </basicItem>" +
-        "    </basicItems>" +
-        "    <attributeItems>" +
-        "       <attributeItem name=\"attr1\" price=\"1.1\"/>" +
-        "       <attributeItem name=\"attr2\" price=\"2.2\"/>" +
-        "       <attributeItem name=\"attr3\" price=\"3.3\"/>" +
-        "    </attributeItems>" +
-        "  </complexItem>" +
-        "  <empty></empty>" +
-    "</root>"
+    let xmlWithComplexType = """
+        <root>
+          <complexItem>
+            <name>the name of complex item</name>
+            <price>1024</price>
+            <basicItems>
+              <basicItem id="1234a">
+                <name>item 1</name>
+                <price>1</price>
+              </basicItem>
+              <basicItem id="1234a">
+                <name>item 2</name>
+                <price>2</price>
+              </basicItem>
+              <basicItem id="1234a">
+                <name>item 3</name>
+                <price>3</price>
+              </basicItem>
+            </basicItems>
+            <attributeItems>
+              <attributeItem name=\"attr1\" price=\"1.1\"/>
+              <attributeItem name=\"attr2\" price=\"2.2\"/>
+              <attributeItem name=\"attr3\" price=\"3.3\"/>
+            </attributeItems>
+          </complexItem>
+          <empty></empty>
+        </root>
+    """
 
     let correctComplexItem = ComplexItem(
         name: "the name of complex item",
-        priceOptional: 1024,
+        priceOptional: 1_024,
         basics: [
-            BasicItem(name: "item 1", price: 1),
-            BasicItem(name: "item 2", price: 2),
-            BasicItem(name: "item 3", price: 3)
+            BasicItem(name: "item 1", price: 1, id: "1234a"),
+            BasicItem(name: "item 2", price: 2, id: "1234b"),
+            BasicItem(name: "item 3", price: 3, id: "1234c")
         ],
         attrs: [
             AttributeItem(name: "attr1", price: 1.1),
@@ -73,6 +75,7 @@ class TypeConversionComplexTypesTests: XCTestCase {
     )
 
     override func setUp() {
+        super.setUp()
         parser = SWXMLHash.parse(xmlWithComplexType)
     }
 
@@ -147,10 +150,10 @@ struct ComplexItem: XMLIndexerDeserializable {
     }
 }
 
-extension ComplexItem: Equatable {}
-
-func == (a: ComplexItem, b: ComplexItem) -> Bool {
-    return a.name == b.name && a.priceOptional == b.priceOptional && a.basics == b.basics && a.attrs == b.attrs
+extension ComplexItem: Equatable {
+    static func == (a: ComplexItem, b: ComplexItem) -> Bool {
+        return a.name == b.name && a.priceOptional == b.priceOptional && a.basics == b.basics && a.attrs == b.attrs
+    }
 }
 
 extension TypeConversionComplexTypesTests {

@@ -1,8 +1,8 @@
 //
-//  MixedTextWithXMLElementsTests.swift
+//  shim.swift
 //  SWXMLHash
 //
-//  Copyright (c) 2016 David Mohundro
+//  Copyright (c) 2018 David Mohundro
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -23,29 +23,14 @@
 //  THE SOFTWARE.
 //
 
-import SWXMLHash
-import XCTest
+#if (!swift(>=4.1) && swift(>=4.0)) || !swift(>=3.3)
 
-// swiftlint:disable line_length
-
-class MixedTextWithXMLElementsTests: XCTestCase {
-    var xml: XMLIndexer?
-
-    override func setUp() {
-        super.setUp()
-        let xmlContent = "<everything><news><content>Here is a cool thing <a href=\"google.com\">A</a> and second cool thing <a href=\"fb.com\">B</a></content></news></everything>"
-        xml = SWXMLHash.parse(xmlContent)
+    extension Sequence {
+        func compactMap<ElementOfResult>(
+            _ transform: (Self.Element
+            ) throws -> ElementOfResult?) rethrows -> [ElementOfResult] {
+            return try flatMap(transform)
+        }
     }
 
-    func testShouldBeAbleToGetAllContentsInsideOfAnElement() {
-        XCTAssertEqual(xml!["everything"]["news"]["content"].description, "<content>Here is a cool thing <a href=\"google.com\">A</a> and second cool thing <a href=\"fb.com\">B</a></content>")
-    }
-}
-
-extension MixedTextWithXMLElementsTests {
-    static var allTests: [(String, (MixedTextWithXMLElementsTests) -> () throws -> Void)] {
-        return [
-            ("testShouldBeAbleToGetAllContentsInsideOfAnElement", testShouldBeAbleToGetAllContentsInsideOfAnElement)
-        ]
-    }
-}
+#endif

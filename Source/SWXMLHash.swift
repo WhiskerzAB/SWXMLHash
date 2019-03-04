@@ -153,18 +153,23 @@ public class SWXMLHash {
 
 struct Stack<T> {
     var items = [T]()
+
     mutating func push(_ item: T) {
         items.append(item)
     }
+
     mutating func pop() -> T {
         return items.removeLast()
     }
+
     mutating func drop() {
         _ = pop()
     }
+
     mutating func removeAll() {
         items.removeAll(keepingCapacity: false)
     }
+
     func top() -> T {
         return items[items.count - 1]
     }
@@ -267,7 +272,7 @@ class LazyXMLParser: NSObject, SimpleXmlParser, XMLParserDelegate {
         super.init()
     }
 
-    let root: XMLElement
+    var root: XMLElement
     var parentStack = Stack<XMLElement>()
     var elementStack = Stack<String>()
 
@@ -281,8 +286,8 @@ class LazyXMLParser: NSObject, SimpleXmlParser, XMLParserDelegate {
     }
 
     func startParsing(_ ops: [IndexOp]) {
-        // clear any prior runs of parse... expected that this won't be necessary,
-        // but you never know
+        // reset state for a new lazy parsing run
+        root = XMLElement(name: rootElementName, options: root.options)
         parentStack.removeAll()
         parentStack.push(root)
 
@@ -426,7 +431,7 @@ class FullXMLParser: NSObject, SimpleXmlParser, XMLParserDelegate {
     }
 
     func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
-#if os(Linux)
+#if os(Linux) && !swift(>=4.1.50)
         if let err = parseError as? NSError {
             parsingError = ParsingError(line: err.userInfo["NSXMLParserErrorLineNumber"] as? Int ?? 0,
                                         column: err.userInfo["NSXMLParserErrorColumn"] as? Int ?? 0)
@@ -513,22 +518,27 @@ public enum IndexingError: Error {
     public static func Attribute(attr: String) -> IndexingError {
         fatalError("unavailable")
     }
+
     @available(*, unavailable, renamed: "attributeValue(attr:value:)")
     public static func AttributeValue(attr: String, value: String) -> IndexingError {
         fatalError("unavailable")
     }
+
     @available(*, unavailable, renamed: "key(key:)")
     public static func Key(key: String) -> IndexingError {
         fatalError("unavailable")
     }
+
     @available(*, unavailable, renamed: "index(idx:)")
     public static func Index(idx: Int) -> IndexingError {
         fatalError("unavailable")
     }
+
     @available(*, unavailable, renamed: "initialize(instance:)")
     public static func Init(instance: AnyObject) -> IndexingError {
         fatalError("unavailable")
     }
+
     @available(*, unavailable, renamed: "error")
     public static var Error: IndexingError {
         fatalError("unavailable")
@@ -829,7 +839,7 @@ extension IndexingError: CustomStringConvertible {
         switch self {
         case .attribute(let attr):
             return "XML Attribute Error: Missing attribute [\"\(attr)\"]"
-        case .attributeValue(let attr, let value):
+        case let .attributeValue(attr, value):
             return "XML Attribute Error: Missing attribute [\"\(attr)\"] with value [\"\(value)\"]"
         case .key(let key):
             return "XML Element Error: Incorrect key [\"\(key)\"]"
@@ -852,6 +862,7 @@ public protocol XMLContent: CustomStringConvertible { }
 public class TextElement: XMLContent {
     /// The underlying text value
     public let text: String
+
     init(text: String) {
         self.text = text
     }
@@ -860,6 +871,7 @@ public class TextElement: XMLContent {
 public struct XMLAttribute {
     public let name: String
     public let text: String
+
     init(name: String, text: String) {
         self.name = name
         self.text = text
@@ -917,7 +929,7 @@ public class XMLElement: XMLContent {
 
     public var innerXML: String {
         return children.reduce("", {
-            return $0.description + $1.description
+            $0.description + $1.description
         })
     }
 
@@ -1001,7 +1013,7 @@ extension XMLElement: CustomStringConvertible {
                 xmlReturn.append(child.description)
             }
             xmlReturn.append("</\(name)>")
-            return xmlReturn.joined(separator: "")
+            return xmlReturn.joined()
         }
 
         return "<\(name)\(attributesString)>\(text)</\(name)>"

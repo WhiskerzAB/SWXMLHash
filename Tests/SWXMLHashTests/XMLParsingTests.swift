@@ -1,5 +1,6 @@
 //
 //  XMLParsingTests.swift
+//  SWXMLHash
 //
 //  Copyright (c) 2016 David Mohundro
 //
@@ -20,15 +21,45 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
+//
 
 import SWXMLHash
 import XCTest
 
-// swiftlint:disable force_try
 // swiftlint:disable line_length
+// swiftlint:disable type_body_length
 
 class XMLParsingTests: XCTestCase {
-    let xmlToParse = "<root><header>header mixed content<title>Test Title Header</title>more mixed content</header><catalog><book id=\"bk101\"><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price><publish_date>2000-10-01</publish_date><description>An in-depth look at creating applications with XML.</description></book><book id=\"bk102\"><author>Ralls, Kim</author><title>Midnight Rain</title><genre>Fantasy</genre><price>5.95</price><publish_date>2000-12-16</publish_date><description>A former architect battles corporate zombies, an evil sorceress, and her own childhood to become queen of the world.</description></book><book id=\"bk103\"><author>Corets, Eva</author><title>Maeve Ascendant</title><genre>Fantasy</genre><price>5.95</price><publish_date>2000-11-17</publish_date><description>After the collapse of a nanotechnology society in England, the young survivors lay the foundation for a new society.</description></book></catalog></root>"
+    let xmlToParse = """
+        <root>
+          <header>header mixed content<title>Test Title Header</title>more mixed content</header>
+          <catalog>
+            <book id=\"bk101\">
+              <author>Gambardella, Matthew</author>
+              <title>XML Developer's Guide</title>
+              <genre>Computer</genre><price>44.95</price>
+              <publish_date>2000-10-01</publish_date>
+              <description>An in-depth look at creating applications with XML.</description>
+            </book>
+            <book id=\"bk102\">
+              <author>Ralls, Kim</author>
+              <title>Midnight Rain</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2000-12-16</publish_date>
+              <description>A former architect battles corporate zombies, an evil sorceress, and her own childhood to become queen of the world.</description>
+            </book>
+            <book id=\"bk103\">
+              <author>Corets, Eva</author>
+              <title>Maeve Ascendant</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2000-11-17</publish_date>
+              <description>After the collapse of a nanotechnology society in England, the young survivors lay the foundation for a new society.</description>
+            </book>
+          </catalog>
+        </root>
+    """
 
     var xml: XMLIndexer?
 
@@ -47,23 +78,41 @@ class XMLParsingTests: XCTestCase {
         XCTAssertEqual(xml!["root"]["catalog"]["book"][1]["author"].element?.text, "Ralls, Kim")
     }
 
+    func testShouldBeAbleToParseElementGroupsByIndex() {
+        XCTAssertEqual(try xml!["root"]["catalog"]["book"].byIndex(1)["author"].element?.text, "Ralls, Kim")
+    }
+
+    func testShouldBeAbleToByIndexWithoutGoingOutOfBounds() {
+        XCTAssertEqual(try xml!["root"]["catalog"]["book"].byIndex(3)["author"].element?.text, nil)
+    }
+
     func testShouldBeAbleToParseAttributes() {
-        XCTAssertEqual(xml!["root"]["catalog"]["book"][1].element?.attributes["id"], "bk102")
         XCTAssertEqual(xml!["root"]["catalog"]["book"][1].element?.attribute(by: "id")?.text, "bk102")
     }
 
     func testShouldBeAbleToLookUpElementsByNameAndAttribute() {
         do {
-            let value = try xml!["root"]["catalog"]["book"].withAttr("id", "bk102")["author"].element?.text
+            let value = try xml!["root"]["catalog"]["book"].withAttribute("id", "bk102")["author"].element?.text
             XCTAssertEqual(value, "Ralls, Kim")
         } catch {
             XCTFail("\(error)")
         }
+    }
 
+    func testShouldBeAbleToLookUpElementsByNameAndAttributeCaseInsensitive() {
+        do {
+            let xmlInsensitive = SWXMLHash.config({ config in
+                config.caseInsensitive = true
+            }).parse(xmlToParse)
+            let value = try xmlInsensitive["rOOt"]["catalOg"]["bOOk"].withAttribute("iD", "Bk102")["authOr"].element?.text
+            XCTAssertEqual(value, "Ralls, Kim")
+        } catch {
+            XCTFail("\(error)")
+        }
     }
 
     func testShouldBeAbleToIterateElementGroups() {
-        let result = xml!["root"]["catalog"]["book"].all.map({ $0["genre"].element!.text! }).joined(separator: ", ")
+        let result = xml!["root"]["catalog"]["book"].all.map({ $0["genre"].element!.text }).joined(separator: ", ")
         XCTAssertEqual(result, "Computer, Fantasy, Fantasy")
     }
 
@@ -77,7 +126,7 @@ class XMLParsingTests: XCTestCase {
 
     func testShouldBeAbleToIterateUsingForIn() {
         var count = 0
-        for _ in xml!["root"]["catalog"]["book"] {
+        for _ in xml!["root"]["catalog"]["book"].all {
             count += 1
         }
 
@@ -102,7 +151,7 @@ class XMLParsingTests: XCTestCase {
             let result = element.children.reduce("") { acc, child in
                 switch child {
                 case let elm as SWXMLHash.XMLElement:
-                    guard let text = elm.text else { return acc }
+                    let text = elm.text
                     return acc + text
                 case let elm as TextElement:
                     return acc + elm.text
@@ -116,11 +165,36 @@ class XMLParsingTests: XCTestCase {
         }
     }
 
+    func testShouldBeAbleToRecursiveOutputTextContent() {
+        let mixedContentXmlInputs = [
+            // From SourceKit cursor info key.annotated_decl
+            "<Declaration>typealias SomeHandle = <Type usr=\"s:Su\">UInt</Type></Declaration>",
+            "<Declaration>var points: [<Type usr=\"c:objc(cs)Location\">Location</Type>] { get set }</Declaration>",
+            // From SourceKit cursor info key.fully_annotated_decl
+            "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>SomeHandle</decl.name> = <ref.struct usr=\"s:Su\">UInt</ref.struct></decl.typealias>",
+            "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>points</decl.name>: <decl.var.type>[<ref.class usr=\"c:objc(cs)Location\">Location</ref.class>]</decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>",
+            "<decl.function.method.instance><syntaxtype.keyword>fileprivate</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>documentedMemberFunc</decl.name>()</decl.function.method.instance>"
+        ]
+
+        let recursiveTextOutputs = [
+            "typealias SomeHandle = UInt",
+            "var points: [Location] { get set }",
+
+            "typealias SomeHandle = UInt",
+            "var points: [Location] { get set }",
+            "fileprivate func documentedMemberFunc()"
+        ]
+
+        for (index, mixedContentXml) in mixedContentXmlInputs.enumerated() {
+            XCTAssertEqual(SWXMLHash.parse(mixedContentXml).element!.recursiveText, recursiveTextOutputs[index])
+        }
+    }
+
     func testShouldHandleInterleavingXMLElements() {
         let interleavedXml = "<html><body><p>one</p><div>two</div><p>three</p><div>four</div></body></html>"
         let parsed = SWXMLHash.parse(interleavedXml)
 
-        let result = parsed["html"]["body"].children.map({ $0.element!.text! }).joined(separator: ", ")
+        let result = parsed["html"]["body"].children.map({ $0.element!.text }).joined(separator: ", ")
         XCTAssertEqual(result, "one, two, three, four")
     }
 
@@ -129,6 +203,13 @@ class XMLParsingTests: XCTestCase {
         let parsed = SWXMLHash.parse(descriptionXml)
 
         XCTAssertEqual(parsed.description, "<root><foo><what id=\"myId\">puppies</what></foo></root>")
+    }
+
+    func testShouldBeAbleToGetInnerXML() {
+        let testXML = "<root><foo><what id=\"myId\">puppies</what><elems><elem>1</elem><elem>2</elem></elems></foo></root>"
+        let parsed = SWXMLHash.parse(testXML)
+
+        XCTAssertEqual(parsed["root"]["foo"].element!.innerXML, "<what id=\"myId\">puppies</what><elems><elem>1</elem><elem>2</elem></elems>")
     }
 
     // error handling
@@ -143,7 +224,7 @@ class XMLParsingTests: XCTestCase {
             XCTAssertNotNil(err)
         }
         do {
-            let _ = try xml!.byKey("root").byKey("what").byKey("header").byKey("foo")
+            _ = try xml!.byKey("root").byKey("what").byKey("header").byKey("foo")
         } catch let error as IndexingError {
             err = error
         } catch { err = nil }
@@ -155,21 +236,102 @@ class XMLParsingTests: XCTestCase {
             XCTAssertNotNil(err)
         }
         do {
-            let _ = try xml!.byKey("what").byKey("subelement").byIndex(5).byKey("nomatch")
+            _ = try xml!.byKey("what").byKey("subelement").byIndex(5).byKey("nomatch")
         } catch let error as IndexingError {
             err = error
         } catch { err = nil }
     }
 
     func testShouldStillReturnErrorsWhenAccessingViaSubscripting() {
-        var err: IndexingError? = nil
+        var err: IndexingError?
         switch xml!["what"]["subelement"][5]["nomatch"] {
-        case .XMLError(let error):
+        case .xmlError(let error):
             err = error
         default:
             err = nil
         }
         XCTAssertNotNil(err)
+    }
+
+    func testShouldBeAbleToCreateASubIndexer() {
+        let xmlToParse = """
+            <root>
+                <some-weird-element />
+                <another-weird-element />
+                <prop1 name="prop1" />
+                <prop2 name="prop2" />
+                <basicItem id="1234a">
+                    <name>item 1</name>
+                    <price>1</price>
+                </basicItem>
+                <prop3 name="prop3" />
+                <last-weird-element />
+            </root>
+        """
+
+        let parser = SWXMLHash.parse(xmlToParse)
+
+        let subIndexer = parser["root"].filterChildren { _, index in index >= 2 && index <= 5 }
+
+        XCTAssertNil(subIndexer["some-weird-element"].element)
+        XCTAssertNil(subIndexer["another-weird-element"].element)
+        XCTAssertNotNil(subIndexer["prop1"].element)
+        XCTAssertNotNil(subIndexer["prop2"].element)
+        XCTAssertNotNil(subIndexer["basicItem"].element)
+        XCTAssertNotNil(subIndexer["prop3"].element)
+        XCTAssertNil(subIndexer["last-weird-element"].element)
+    }
+
+    func testShouldBeAbleToCreateASubIndexerFromFilter() {
+        let subIndexer = xml!["root"]["catalog"]["book"][1].filterChildren { elem, _ in
+            let filterByNames = ["title", "genre", "price"]
+            return filterByNames.contains(elem.name)
+        }
+
+        XCTAssertEqual(subIndexer.children[0].element?.name, "title")
+        XCTAssertEqual(subIndexer.children[1].element?.name, "genre")
+        XCTAssertEqual(subIndexer.children[2].element?.name, "price")
+
+        XCTAssertEqual(subIndexer.children[0].element?.text, "Midnight Rain")
+        XCTAssertEqual(subIndexer.children[1].element?.text, "Fantasy")
+        XCTAssertEqual(subIndexer.children[2].element?.text, "5.95")
+    }
+
+    func testShouldBeAbleToFilterOnIndexer() {
+        let subIndexer = xml!["root"]["catalog"]["book"]
+            .filterAll { elem, _ in elem.attribute(by: "id")!.text == "bk102" }
+            .filterChildren { _, index in index >= 1 && index <= 3 }
+
+        XCTAssertEqual(subIndexer.children[0].element?.name, "title")
+        XCTAssertEqual(subIndexer.children[1].element?.name, "genre")
+        XCTAssertEqual(subIndexer.children[2].element?.name, "price")
+
+        XCTAssertEqual(subIndexer.children[0].element?.text, "Midnight Rain")
+        XCTAssertEqual(subIndexer.children[1].element?.text, "Fantasy")
+        XCTAssertEqual(subIndexer.children[2].element?.text, "5.95")
+    }
+
+    func testShouldThrowErrorForInvalidXML() {
+        let invalidXML = "<uh oh>what is this"
+        var err: ParsingError?
+        let parser = SWXMLHash.config { config in
+            config.detectParsingErrors = true
+        }.parse(invalidXML)
+
+        switch parser {
+        case .parsingError(let error):
+            err = error
+        default:
+            err = nil
+        }
+
+        XCTAssertNotNil(err)
+
+#if !os(Linux)
+        if err != nil {
+            XCTAssert(err!.line == 1)
+        }
+#endif
     }
 }
 
@@ -178,8 +340,11 @@ extension XMLParsingTests {
         return [
             ("testShouldBeAbleToParseIndividualElements", testShouldBeAbleToParseIndividualElements),
             ("testShouldBeAbleToParseElementGroups", testShouldBeAbleToParseElementGroups),
+            ("testShouldBeAbleToParseElementGroupsByIndex", testShouldBeAbleToParseElementGroupsByIndex),
+            ("testShouldBeAbleToByIndexWithoutGoingOutOfBounds", testShouldBeAbleToByIndexWithoutGoingOutOfBounds),
             ("testShouldBeAbleToParseAttributes", testShouldBeAbleToParseAttributes),
             ("testShouldBeAbleToLookUpElementsByNameAndAttribute", testShouldBeAbleToLookUpElementsByNameAndAttribute),
+            ("testShouldBeAbleToLookUpElementsByNameAndAttributeCaseInsensitive", testShouldBeAbleToLookUpElementsByNameAndAttributeCaseInsensitive),
             ("testShouldBeAbleToIterateElementGroups", testShouldBeAbleToIterateElementGroups),
             ("testShouldBeAbleToIterateElementGroupsEvenIfOnlyOneElementIsFound", testShouldBeAbleToIterateElementGroupsEvenIfOnlyOneElementIsFound),
             ("testShouldBeAbleToIndexElementGroupsEvenIfOnlyOneElementIsFound", testShouldBeAbleToIndexElementGroupsEvenIfOnlyOneElementIsFound),
@@ -187,12 +352,16 @@ extension XMLParsingTests {
             ("testShouldBeAbleToEnumerateChildren", testShouldBeAbleToEnumerateChildren),
             ("testShouldBeAbleToHandleMixedContent", testShouldBeAbleToHandleMixedContent),
             ("testShouldBeAbleToIterateOverMixedContent", testShouldBeAbleToIterateOverMixedContent),
+            ("testShouldBeAbleToRecursiveOutputTextContent", testShouldBeAbleToRecursiveOutputTextContent),
             ("testShouldHandleInterleavingXMLElements", testShouldHandleInterleavingXMLElements),
             ("testShouldBeAbleToProvideADescriptionForTheDocument", testShouldBeAbleToProvideADescriptionForTheDocument),
             ("testShouldReturnNilWhenKeysDontMatch", testShouldReturnNilWhenKeysDontMatch),
             ("testShouldProvideAnErrorObjectWhenKeysDontMatch", testShouldProvideAnErrorObjectWhenKeysDontMatch),
             ("testShouldProvideAnErrorElementWhenIndexersDontMatch", testShouldProvideAnErrorElementWhenIndexersDontMatch),
-            ("testShouldStillReturnErrorsWhenAccessingViaSubscripting", testShouldStillReturnErrorsWhenAccessingViaSubscripting)
+            ("testShouldStillReturnErrorsWhenAccessingViaSubscripting", testShouldStillReturnErrorsWhenAccessingViaSubscripting),
+            ("testShouldBeAbleToCreateASubIndexerFromFilter", testShouldBeAbleToCreateASubIndexerFromFilter),
+            ("testShouldBeAbleToFilterOnIndexer", testShouldBeAbleToFilterOnIndexer),
+            ("testShouldThrowErrorForInvalidXML", testShouldThrowErrorForInvalidXML)
         ]
     }
 }

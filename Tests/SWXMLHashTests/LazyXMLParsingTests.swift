@@ -1,5 +1,6 @@
 //
 //  LazyXMLParsingTests.swift
+//  SWXMLHash
 //
 //  Copyright (c) 2016 David Mohundro
 //
@@ -20,22 +21,49 @@
 //  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 //  THE SOFTWARE.
+//
 
 import SWXMLHash
 import XCTest
 
-// swiftlint:disable force_try
 // swiftlint:disable line_length
 
 class LazyXMLParsingTests: XCTestCase {
-    let xmlToParse = "<root><header>header mixed content<title>Test Title Header</title>more mixed content</header><catalog><book id=\"bk101\"><author>Gambardella, Matthew</author><title>XML Developer's Guide</title><genre>Computer</genre><price>44.95</price><publish_date>2000-10-01</publish_date><description>An in-depth look at creating applications with XML.</description></book><book id=\"bk102\"><author>Ralls, Kim</author><title>Midnight Rain</title><genre>Fantasy</genre><price>5.95</price><publish_date>2000-12-16</publish_date><description>A former architect battles corporate zombies, an evil sorceress, and her own childhood to become queen of the world.</description></book><book id=\"bk103\"><author>Corets, Eva</author><title>Maeve Ascendant</title><genre>Fantasy</genre><price>5.95</price><publish_date>2000-11-17</publish_date><description>After the collapse of a nanotechnology society in England, the young survivors lay the foundation for a new society.</description></book></catalog></root>"
+    let xmlToParse = """
+        <root>
+          <header>header mixed content<title>Test Title Header</title>more mixed content</header>
+          <catalog>
+            <book id=\"bk101\">
+              <author>Gambardella, Matthew</author>
+              <title>XML Developer's Guide</title>
+              <genre>Computer</genre><price>44.95</price>
+              <publish_date>2000-10-01</publish_date>
+              <description>An in-depth look at creating applications with XML.</description>
+            </book>
+            <book id=\"bk102\">
+              <author>Ralls, Kim</author>
+              <title>Midnight Rain</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2000-12-16</publish_date>
+              <description>A former architect battles corporate zombies, an evil sorceress, and her own childhood to become queen of the world.</description>
+            </book>
+            <book id=\"bk103\">
+              <author>Corets, Eva</author>
+              <title>Maeve Ascendant</title>
+              <genre>Fantasy</genre>
+              <price>5.95</price>
+              <publish_date>2000-11-17</publish_date>
+              <description>After the collapse of a nanotechnology society in England, the young survivors lay the foundation for a new society.</description>
+            </book>
+          </catalog>
+        </root>
+    """
 
     var xml: XMLIndexer?
 
     override func setUp() {
         super.setUp()
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
         xml = SWXMLHash.config { config in config.shouldProcessLazily = true }.parse(xmlToParse)
     }
 
@@ -43,18 +71,22 @@ class LazyXMLParsingTests: XCTestCase {
         XCTAssertEqual(xml!["root"]["header"]["title"].element?.text, "Test Title Header")
     }
 
+    func testShouldBeAbleToHandleSubsequentParseCalls() {
+        XCTAssertEqual(xml!["root"]["header"]["title"].element?.text, "Test Title Header")
+        XCTAssertEqual(xml!["root"]["catalog"]["book"][1]["author"].element?.text, "Ralls, Kim")
+    }
+
     func testShouldBeAbleToParseElementGroups() {
         XCTAssertEqual(xml!["root"]["catalog"]["book"][1]["author"].element?.text, "Ralls, Kim")
     }
 
     func testShouldBeAbleToParseAttributes() {
-        XCTAssertEqual(xml!["root"]["catalog"]["book"][1].element?.attributes["id"], "bk102")
         XCTAssertEqual(xml!["root"]["catalog"]["book"][1].element?.attribute(by: "id")?.text, "bk102")
     }
 
     func testShouldBeAbleToLookUpElementsByNameAndAttribute() {
         do {
-            let value = try xml!["root"]["catalog"]["book"].withAttr("id", "bk102")["author"].element?.text
+            let value = try xml!["root"]["catalog"]["book"].withAttribute("id", "bk102")["author"].element?.text
             XCTAssertEqual(value, "Ralls, Kim")
         } catch {
             XCTFail("\(error)")
@@ -62,7 +94,7 @@ class LazyXMLParsingTests: XCTestCase {
     }
 
     func testShouldBeAbleToIterateElementGroups() {
-        let result = xml!["root"]["catalog"]["book"].all.map({ $0["genre"].element!.text! }).joined(separator: ", ")
+        let result = xml!["root"]["catalog"]["book"].all.map({ $0["genre"].element!.text }).joined(separator: ", ")
         XCTAssertEqual(result, "Computer, Fantasy, Fantasy")
     }
 
@@ -76,7 +108,7 @@ class LazyXMLParsingTests: XCTestCase {
 
     func testShouldBeAbleToIterateUsingForIn() {
         var count = 0
-        for _ in xml!["root"]["catalog"]["book"] {
+        for _ in xml!["root"]["catalog"]["book"].all {
             count += 1
         }
 
@@ -96,7 +128,7 @@ class LazyXMLParsingTests: XCTestCase {
         let interleavedXml = "<html><body><p>one</p><div>two</div><p>three</p><div>four</div></body></html>"
         let parsed = SWXMLHash.parse(interleavedXml)
 
-        let result = parsed["html"]["body"].children.map({ $0.element!.text! }).joined(separator: ", ")
+        let result = parsed["html"]["body"].children.map({ $0.element!.text }).joined(separator: ", ")
         XCTAssertEqual(result, "one, two, three, four")
     }
 
@@ -107,10 +139,22 @@ class LazyXMLParsingTests: XCTestCase {
         XCTAssertEqual(parsed.description, "<root><foo><what id=\"myId\">puppies</what></foo></root>")
     }
 
-    // error handling
-
     func testShouldReturnNilWhenKeysDontMatch() {
         XCTAssertNil(xml!["root"]["what"]["header"]["foo"].element?.name)
+    }
+
+    func testShouldBeAbleToFilterOnIndexer() {
+        let subIndexer = xml!["root"]["catalog"]["book"]
+            .filterAll { elem, _ in elem.attribute(by: "id")!.text == "bk102" }
+            .filterChildren { _, index in index >= 1 && index <= 3 }
+
+        XCTAssertEqual(subIndexer.children[0].element?.name, "title")
+        XCTAssertEqual(subIndexer.children[1].element?.name, "genre")
+        XCTAssertEqual(subIndexer.children[2].element?.name, "price")
+
+        XCTAssertEqual(subIndexer.children[0].element?.text, "Midnight Rain")
+        XCTAssertEqual(subIndexer.children[1].element?.text, "Fantasy")
+        XCTAssertEqual(subIndexer.children[2].element?.text, "5.95")
     }
 }
 
@@ -129,7 +173,8 @@ extension LazyXMLParsingTests {
             ("testShouldBeAbleToHandleMixedContent", testShouldBeAbleToHandleMixedContent),
             ("testShouldHandleInterleavingXMLElements", testShouldHandleInterleavingXMLElements),
             ("testShouldBeAbleToProvideADescriptionForTheDocument", testShouldBeAbleToProvideADescriptionForTheDocument),
-            ("testShouldReturnNilWhenKeysDontMatch", testShouldReturnNilWhenKeysDontMatch)
+            ("testShouldReturnNilWhenKeysDontMatch", testShouldReturnNilWhenKeysDontMatch),
+            ("testShouldBeAbleToFilterOnIndexer", testShouldBeAbleToFilterOnIndexer)
         ]
     }
 }
